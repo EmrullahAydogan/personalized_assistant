@@ -1,4 +1,5 @@
 from typing import List, Dict, AsyncGenerator
+import asyncio
 import google.generativeai as genai
 from app.services.ai_base import AIServiceBase
 from app.core.config import settings
@@ -34,15 +35,17 @@ class GeminiService(AIServiceBase):
         # Get the last message
         last_message = gemini_messages[-1]["parts"][0] if gemini_messages else ""
 
-        generation_config = {
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
-        }
+        generation_config = genai.GenerationConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        )
 
         if stream:
             return self._stream_chat(last_message, generation_config)
 
-        response = await self.chat_session.send_message_async(
+        # Run sync API in thread pool to avoid blocking
+        response = await asyncio.to_thread(
+            self.chat_session.send_message,
             last_message,
             generation_config=generation_config,
         )
@@ -52,16 +55,18 @@ class GeminiService(AIServiceBase):
     async def _stream_chat(
         self,
         message: str,
-        generation_config: dict,
+        generation_config: genai.GenerationConfig,
     ) -> AsyncGenerator[str, None]:
         """Stream chat responses"""
-        response = await self.chat_session.send_message_async(
+        # Gemini streaming is sync, so we need to wrap it
+        response = await asyncio.to_thread(
+            self.chat_session.send_message,
             message,
             generation_config=generation_config,
             stream=True,
         )
 
-        async for chunk in response:
+        for chunk in response:
             if chunk.text:
                 yield chunk.text
 

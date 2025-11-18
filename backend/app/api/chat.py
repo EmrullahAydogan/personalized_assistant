@@ -80,7 +80,13 @@ async def chat(
             detail="Streaming not yet implemented",
         )
 
-    ai_response = await ai_service.chat(messages)
+    try:
+        ai_response = await ai_service.chat(messages)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI service error: {str(e)}",
+        )
 
     # Create assistant message
     assistant_message = Message(

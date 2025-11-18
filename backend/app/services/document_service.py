@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import Optional
 from PyPDF2 import PdfReader
 from docx import Document
@@ -44,33 +45,45 @@ class DocumentService:
 
     async def _extract_pdf(self, file_path: str) -> str:
         """Extract text from PDF"""
-        text = ""
-        reader = PdfReader(file_path)
+        def _extract():
+            text = ""
+            reader = PdfReader(file_path)
 
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
 
-        return text.strip()
+            return text.strip()
+
+        return await asyncio.to_thread(_extract)
 
     async def _extract_docx(self, file_path: str) -> str:
         """Extract text from DOCX"""
-        doc = Document(file_path)
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-        return text.strip()
+        def _extract():
+            doc = Document(file_path)
+            text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            return text.strip()
+
+        return await asyncio.to_thread(_extract)
 
     async def _extract_txt(self, file_path: str) -> str:
         """Extract text from TXT"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read().strip()
+        def _extract():
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+
+        return await asyncio.to_thread(_extract)
 
     async def _extract_image(self, file_path: str) -> str:
         """Extract text from image using OCR"""
-        try:
-            image = Image.open(file_path)
-            text = pytesseract.image_to_string(image, lang='tur+eng')
-            return text.strip()
-        except Exception as e:
-            return f"Error extracting text from image: {str(e)}"
+        def _extract():
+            try:
+                image = Image.open(file_path)
+                text = pytesseract.image_to_string(image, lang='tur+eng')
+                return text.strip()
+            except Exception as e:
+                return f"Error extracting text from image: {str(e)}"
+
+        return await asyncio.to_thread(_extract)
 
     async def analyze_document(
         self,
